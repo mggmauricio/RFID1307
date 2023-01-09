@@ -14,6 +14,7 @@ boolean programMode = false;
 MFRC522::MIFARE_Key key;
 MFRC522::StatusCode status;
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+const int EEPROM_ADDRESS = 0;
 
 void setup() {
   Serial.begin(9600);
