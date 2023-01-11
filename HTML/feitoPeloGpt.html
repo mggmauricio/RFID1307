@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Clean Code Example</title>
+  </head>
+  <body>
+    <button id="open-close-btn" class="btn">Abrir/Fechar</button>
+    <button id="register-remove-btn" class="btn">Cadastrar/Remover</button>
+
+    <script>
+      // Use nomes descritivos para identificar facilmente o que cada botão faz
+      const openCloseBtn = document.getElementById("open-close-btn");
+      const registerRemoveBtn = document.getElementById("register-remove-btn");
+
+      // Utilize funções para organizar o código e facilitar a manutenção
+      function openCloseHandler() {
+        // lógica para abrir ou fechar aqui
+      }
+
+      function registerRemoveHandler() {
+        // lógica para cadastrar ou remover aqui
+      }
+
+      // Adicione os eventos aos botões
+      openCloseBtn.addEventListener("click", openCloseHandler);
+      registerRemoveBtn.addEventListener("click", registerRemoveHandler);
+
+    </script>
+  </body>
+</html>
