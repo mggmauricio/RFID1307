@@ -30,15 +30,11 @@
   document.getElementById('Register').addEventListener('click', registerCard);
   document.getElementById('DoorStatus').addEventListener('click', changeDoorStatus);
 
-  let Socket;
-
+  var Socket;
+  
   function init() {
-    console.log('Called init');
     Socket = new WebSocket('ws://' + window.location.hostname + ':81/');
-    Socket.onopen = function (event) {
-      console.log('conectou');
-    }
-    Socket.onmessage = function (event) {
+    Socket.onmessage = function(event) {
       processCommand(event);
     };
   }
@@ -66,8 +62,6 @@
     const socketMsg = { type: 'DoorOpened', value: false };
     Socket.send(JSON.stringify(socketMsg));
   }
-
-  control
 
   function isDoorOpen() {
     return document.getElementById('DoorStatus').textContent === 'ABRIR';
