@@ -4,67 +4,143 @@
 <head>
   <title>Sala 1307</title>
 </head>
+<style>
+  body {
+    background-color: #404241;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
 
-<body style='background-color: #EEEEEE; display: flex; align-items: center;
-  justify-content: center; font-size: 24px;'>
+  span {
+    color: #7ab3ec;
+    font-size: 36px;
+  }
 
-  <span style='color: #003366;'>
+  h1 {
+    text-align: center;
+  }
 
-    <h1 style='text-align: center;'>Sala 1307</h1>
+  h3 {
+    color: #dbdee0;
+    margin-top: 72px;
+    text-align: center;
+  }
 
-    <h3 style='color: #2596be; margin-top: 72px; text-align: center;'>Estado da porta:</h3>
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
 
-    <form
-      style='display: flex;flex-direction: column; align-items: center; justify-content: space-between; width: 100%;'>
-      <button id='DoorStatus' type='button' name='DoorStatus'
-        style='height:48px; border: none;border-radius: 8px; width: 100%; color:#ffffffff; font-weight: bold; background-color:#2E8A34;'>ABRIR</button>
+  button {
+    opacity: 1;
+    cursor: pointer;
+    height: 48px;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    color: #ffffffff;
+    font-weight: bold;
+    font-size: 18px;
+  }
 
-      <button id='Register' type='button'
-        style='height:48px; border: none;border-radius: 8px; width: 100%; margin-top:12px; color:#ffffffff; font-weight: bold;background-color:#7A37A4;'>
-        Cadastrar/remover cartão
+  button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  button:hover:enabled {
+    border: 1px solid #001211;
+  }
+</style>
+
+<body>
+  <span>
+    <h1>Sala 1307</h1>
+    <h3>Controle de Acesso</h3>
+    <form>
+      <button id='DoorStatus' type='button' name='DoorStatus' disabled=true style='background-color:#2E8A34;'>ABRIR</button>
+
+      <button id='Register' type='button' disabled=true style='background-color:#7A37A4;'>
+        Cadastrar ou remover cartão
       </button>
     </form>
+  </span>
 </body>
 
 <script>
-  document.getElementById('Register').addEventListener('click', registerCard);
+  document.getElementById('Register').addEventListener('click', setRegistrationMode);
   document.getElementById('DoorStatus').addEventListener('click', changeDoorStatus);
+
+  const availableEvents = {
+    isRegistrationMode: setRegistrationMode,
+    isDoorOpen: updateDoorStatusFromSocket
+  }
 
   let Socket;
 
-  function init() {
-    console.log('Called init');
-    Socket = new WebSocket('ws://' + window.location.hostname + ':81/');
-    Socket.onopen = function (event) {
-      console.log('conectou');
-    }
-    Socket.onmessage = function (event) {
-      processCommand(event);
-    };
-  }
-
-  function registerCard() {
-    console.log('Called registerCard');
-    document.getElementById('Register').textContent = 'Aproxime o cartão';
-    document.getElementById('Register').style.backgroundColor = 'rgb(6, 9, 19)';
-
-    const socketMsg = { type: 'setRegisterMode', value: true };
+  function sendWebsocketMessage(socketMsg) {
     Socket.send(JSON.stringify(socketMsg));
   }
 
-  function setDoorOpened() {
-    console.log('Called setDoorOpened');
+  function onWebsocketMessage(event) {
+    processCommand(event);
+  }
+  function onWebsocketOpen() {
+    console.log('WebSocket Connected')
+    getCurrentStatusFromSocket()
+  }
+  function onWebsocketClose() {
+    console.log('WebSocket Connection lost. Trying to reconnect in 2 seconds!');
+    setTimeout(initWebSocket, 2000);
+  }
+
+  function setRegistrationMode(fromSocket = false) {
+    document.getElementById('Register').textContent = 'Cancelar';
+    document.getElementById('Register').style.backgroundColor = 'rgb(6, 9, 19)';
+    window.alert('Aproxime o cartão quando as luzes estiverem piscando')
+
+    if (fromSocket) return;
+
+    const socketMsg = { type: 'isRegistrationMode', value: true };
+
+    sendWebsocketMessage(socketMsg)
+  }
+
+  function setReadingMode(fromSocket = false) {
+    document.getElementById('Register').textContent = 'Cadastrar ou remover cartão';
+    document.getElementById('Register').style.backgroundColor = 'rgb(122, 55, 164)';
+
+    if (fromSocket) return;
+
+    const socketMsg = { type: 'isRegistrationMode', value: false };
+
+    sendWebsocketMessage(socketMsg)
+  }
+
+  function setDoorOpened(fromSocket = false) {
     document.getElementById('DoorStatus').textContent = 'ABRIR';
     document.getElementById('DoorStatus').style.backgroundColor = 'rgb(46, 138, 52)';
-    const socketMsg = { type: 'DoorOpened', value: true };
-    Socket.send(JSON.stringify(socketMsg));
+
+    if (fromSocket) return;
+
+    const socketMsg = { type: 'isDoorOpened', value: true };
+    sendWebsocketMessage(socketMsg);
   }
-  function setDoorClosed() {
-    console.log('Called setDoorClosed');
+
+  function setDoorClosed(fromSocket = false) {
     document.getElementById('DoorStatus').textContent = 'FECHAR';
     document.getElementById('DoorStatus').style.backgroundColor = 'rgb(184, 75, 61)';
-    const socketMsg = { type: 'DoorOpened', value: false };
-    Socket.send(JSON.stringify(socketMsg));
+
+    if (fromSocket) return;
+
+    const socketMsg = { type: 'isDoorOpened', value: false };
+    sendWebsocketMessage(socketMsg);
   }
 
   function isDoorOpen() {
@@ -72,7 +148,6 @@
   }
 
   function changeDoorStatus() {
-    console.log('Called changeDoorStatus');
     if (isDoorOpen()) {
       setDoorClosed();
     } else {
@@ -80,23 +155,37 @@
     }
   }
 
-  function updateDoorStatus(toDoorOpened) {
+  function getCurrentStatusFromSocket() {
+    const socketMsg = { type: 'getStatus', value: true };
+    sendWebsocketMessage(socketMsg);
+  }
+
+  function updateDoorStatusFromSocket(toDoorOpened) {
+    document.getElementById('Register').disabled = false
+    document.getElementById('DoorStatus').disabled = false
+
     if (toDoorOpened) {
-      setDoorOpened();
+      setDoorOpened(true);
     } else {
-      setDoorClosed();
+      setDoorClosed(true);
     }
   }
 
   function processCommand(event) {
-    let obj = JSON.parse(event.data);
-    let type = obj.type;
-    console.log({ obj, type });
+    let { type, value } = JSON.parse(event.data);
+
+    if (availableEvents[type]) availableEvents[type](value)
   }
 
-  window.onload = function (event) {
-    init();
+  function initWebSocket() {
+    console.log('Trying to initialize websocket connection.');
+    Socket = new WebSocket('ws://' + window.location.hostname + ':81/');
+    Socket.onmessage = onWebsocketMessage;
+    Socket.onclose = onWebsocketClose;
+    Socket.onopen = onWebsocketOpen;
   }
+
+  window.onload = initWebSocket
 </script>
 
 </html>
