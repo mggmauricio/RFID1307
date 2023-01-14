@@ -82,65 +82,74 @@ void blinkOpenLight(){
 
 boolean checkCardInEEPROM() {
   // Compare the last card UID with the one stored in EEPROM
-  EEPROM.begin(32); // Start EEPROM access
-  for (int i = 0; i < 4; i++) {
-    if (EEPROM.read(i) != CardUID[i]) {
-      Serial.println("Not in EEPROM");
-      EEPROM.end(); // End EEPROM access
-      return false; // Return failure
+  int address = 0;
+  while (address < EEPROM.length()) {
+    int i;
+    for (i = 0; i < CardID.length(); i++) {
+      if (EEPROM.read(endereco + i) != CardID[i]) {
+        break;
+      }
     }
+    if (i == CardID.length() && EEPROM.read(address + i) == 0) {
+      return true;
+    }
+    address++;
   }
-  EEPROM.end(); // End EEPROM access
-  Serial.println("UID in EEPROM");
-  return true; // Return success
+  return false;
 }
 
-byte readCard() {
-  CardID = "";
-  // Check if a card is present
-  if (mfrc522.PICC_IsNewCardPresent()) {
-    // Select the card
-    if (mfrc522.PICC_ReadCardSerial()) {
-      // Print the UID of the card
-      Serial.print("Card UID: ");
-      for (byte i = 0; i < mfrc522.uid.size; i++) {
-         CardUID[i] = mfrc522.uid.uidByte[i];
-         CardID += String(CardUID[i], HEX);
-      }
-      Serial.println(CardID);
-      mfrc522.PICC_HaltA(); // halt PICC
-      mfrc522.PCD_StopCrypto1();
-      return 1; // Return success
-    }
+String readCard() {
+   if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    return "";
   }
-  return 0; // Return failure
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
+    return "";
+  }
+  String CardID = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    CardID += String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+    CardID += String(mfrc522.uid.uidByte[i], HEX);
+  }
+  deletaEEPROM(CardID);
+  return CardID;
 }
 
 void saveCardToEEPROM() {
   // Save the UID to EEPROM
-  EEPROM.begin(32); // Start EEPROM access
-  for (int i = 0; i < mfrc522.uid.size; i++) {
-    EEPROM.write(i, mfrc522.uid.uidByte[i]);
+  int address = 0;
+  while (EEPROM.read(address) != 0) {
+    address++;
   }
-  EEPROM.commit(); // Save data to EEPROM
-  EEPROM.end(); // End EEPROM access
-  Serial.println("UID saved to EEPROM");
+  for (int i = 0; i < CardID.length(); i++) {
+    EEPROM.write(address++, CardID[i]);
+  }
+  EEPROM.write(address, 0);
+  Serial.println("Código " + CardID + " gravado na EEPROM.");
 }
 
 void deleteCardFromEEPROM() {
-  // Check if a card is present
-  if (mfrc522.PICC_IsNewCardPresent()) {
-    // Select the card
-    if (mfrc522.PICC_ReadCardSerial()) {
-      // Clear the UID from the EEPROM
-      EEPROM.begin(32); // Start EEPROM access
-      for (int i = 0; i < mfrc522.uid.size; i++) {
-        EEPROM.write(i, 0x00);
+  int address = 0;
+  bool found = false;
+  while (!found && address < EEPROM.length()) {
+    int i;
+    for (i = 0; i < codigo.length(); i++) {
+      if (EEPROM.read(endereco + i) != codigo[i]) {
+        break;
       }
-      EEPROM.commit(); // Save data to EEPROM
-      EEPROM.end(); // End EEPROM access
-      Serial.println("UID deleted from EEPROM");
     }
+    if (i == codigo.length() && EEPROM.read(address + i) == 0) {
+      found = true;
+      break;
+    }
+    address++;
+  }
+  if (found) {
+    for (int i = 0; i <= codigo.length(); i++) {
+      EEPROM.write(address + i, 0);
+    }
+    Serial.println("Código " + codigo + " deletado da EEPROM.");
+  } else {
+    Serial.println("Código " + codigo + " não encontrado na EEPROM.");
   }
 }
 
