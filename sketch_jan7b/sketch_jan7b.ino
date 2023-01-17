@@ -12,10 +12,11 @@
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 String AuthorizedID = "";
-String CardID = ""; // Create MFRC522 instance
+// String CardID = ""; // Create MFRC522 instance
 byte CardUID[4];
 bool isDoorOpen = false;
-bool isProgrammingMode = false;
+bool isProgrammingMode = true;
+bool detected = false;
 
 void setProgrammingState(){
   isProgrammingMode = true;  
@@ -81,8 +82,7 @@ void blinkOpenLight(){
 }
 
 boolean checkCardInEEPROM() {
-  // Compare the last card UID with the one stored in EEPROM
-  EEPROM.begin(32); // Start EEPROM access
+ EEPROM.begin(32); // Start EEPROM access
   for (int i = 0; i < 4; i++) {
     if (EEPROM.read(i) != CardUID[i]) {
       Serial.println("Not in EEPROM");
@@ -95,8 +95,9 @@ boolean checkCardInEEPROM() {
   return true; // Return success
 }
 
-byte readCard() {
-  CardID = "";
+
+String readCard() {
+  String CardID = "";
   // Check if a card is present
   if (mfrc522.PICC_IsNewCardPresent()) {
     // Select the card
@@ -110,70 +111,120 @@ byte readCard() {
       Serial.println(CardID);
       mfrc522.PICC_HaltA(); // halt PICC
       mfrc522.PCD_StopCrypto1();
-      return 1; // Return success
+      return CardID;
+      // Return success
     }
   }
-  return 0; // Return failure
+  return ""; // Return failure
 }
 
-void saveCardToEEPROM() {
+void saveCardToEEPROM(String cardUID) {
   // Save the UID to EEPROM
-  EEPROM.begin(32); // Start EEPROM access
-  for (int i = 0; i < mfrc522.uid.size; i++) {
-    EEPROM.write(i, mfrc522.uid.uidByte[i]);
+  // Get the current number of stored cards
+  int numCards = EEPROM.read(0);
+
+  // Calculate the next available address for the new card
+  int nextAddress = numCards * 4 + 1;
+
+  // Convert the string to an array of bytes
+  uint8_t cardBytes[4];
+  for (int i = 0; i < 4; i++) {
+    cardBytes[i] = cardUID.charAt(i);
   }
-  EEPROM.commit(); // Save data to EEPROM
-  EEPROM.end(); // End EEPROM access
-  Serial.println("UID saved to EEPROM");
+
+  // Write the card UID to EEPROM
+  for (int i = 0; i < 4; i++) {
+    EEPROM.write(nextAddress + i, cardBytes[i]);
+  }
+
+  // Increment the number of stored cards
+  numCards++;
+  EEPROM.write(0, numCards);
+
+  // Commit the changes to EEPROM
+  EEPROM.commit();
+  Serial.println("Cartao salvo no endereço: " + nextAddress);
 }
 
-void deleteCardFromEEPROM() {
+
+void deleteCardFromEEPROM(String cardUID){
   // Check if a card is present
-  if (mfrc522.PICC_IsNewCardPresent()) {
-    // Select the card
-    if (mfrc522.PICC_ReadCardSerial()) {
-      // Clear the UID from the EEPROM
-      EEPROM.begin(32); // Start EEPROM access
-      for (int i = 0; i < mfrc522.uid.size; i++) {
-        EEPROM.write(i, 0x00);
+  // Convert the string to an array of bytes
+  uint8_t cardBytes[4];
+  for (int i = 0; i < cardUID.length(); i++) {
+    cardBytes[i] = cardUID.charAt(i);
+  }
+
+  // Get the number of stored cards
+  int numCards = EEPROM.read(0);
+
+  // Search for the card in EEPROM
+  for (int i = 0; i < numCards; i++) {
+    int address = i * 4 + 1;
+    bool match = true;
+    for (int j = 0; j < cardUID.length(); j++) {
+      if (EEPROM.read(address + j) != cardBytes[j]) {
+        match = false;
+        break;
       }
-      EEPROM.commit(); // Save data to EEPROM
-      EEPROM.end(); // End EEPROM access
-      Serial.println("UID deleted from EEPROM");
+    }
+    if (match) {
+      // Shift all the cards after the matched card to the left
+      for (int j = i + 1; j < numCards; j++) {
+        int nextAddress = j * 4 + 1;
+        for (int k = 0; k < 4; k++) {
+          EEPROM.write(address + k, EEPROM.read(nextAddress + k));
+        }
+        address = nextAddress;
+      }
+      // Decrement the number of stored cards
+      numCards--;
+      EEPROM.write(0, numCards);
+      // Commit the changes to EEPROM
+      EEPROM.commit();
+      break;
     }
   }
 }
+
 
 
 
 void handleProgrammingMode(){
   // Serial.println("PROGRAMMING MODE");
-  if(readCard() && checkCardInEEPROM()){
-    deleteCardFromEEPROM();
+  String Card = "";
+  while(Card == ""){
+    Card = readCard();
+  }
+  Serial.println("Saiu do while");
+  if((Card != "") && checkCardInEEPROM()){
+    deleteCardFromEEPROM(Card);
     Serial.println("deveria apagar");
     return;
-  }else if(readCard() && !checkCardInEEPROM()){
-    saveCardToEEPROM();
-    Serial.println("Deveria salvar");
-    
+  }else if((Card =! "") && !checkCardInEEPROM()){
+    Serial.println("DEVERIA SALVAR AGORA");
+    saveCardToEEPROM(Card);
     return;
   }
 }
 
 void handleReadingMode(){
+  
   while(!isDoorOpen){
-    if(readCard() && checkCardInEEPROM()){
+    String Card = readCard();
+    if((Card != "") && checkCardInEEPROM()){
       blinkOpenLight();    
-      AuthorizedID = CardID;
-      Serial.println(CardID);
+      AuthorizedID = Card;
+      Serial.println(Card);
       Serial.println(AuthorizedID);
       Serial.println(isDoorOpen);
       setDoorOpen();  
     }
   }
   while(isDoorOpen){
+    String Card = readCard();
     // Serial.println("TA ABERTA");
-    if(readCard() && (CardID == AuthorizedID)){
+    if(Card != "" && (Card == AuthorizedID)){
       setDoorClosed(); 
     }
   }
