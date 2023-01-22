@@ -15,7 +15,7 @@ String AuthorizedID = "";
 // String CardID = ""; // Create MFRC522 instance
 byte CardUID[4];
 bool isDoorOpen = false;
-bool isProgrammingMode = true;
+bool isProgrammingMode = false;
 bool detected = false;
 
 void setProgrammingState(){
@@ -105,8 +105,8 @@ String readCard() {
       // Print the UID of the card
       Serial.print("Card UID: ");
       for (byte i = 0; i < mfrc522.uid.size; i++) {
-         CardUID[i] = mfrc522.uid.uidByte[i];
-         CardID += String(CardUID[i], HEX);
+        CardUID[i] = mfrc522.uid.uidByte[i];
+        CardID += String(CardUID[i], HEX);
       }
       Serial.println(CardID);
       mfrc522.PICC_HaltA(); // halt PICC
@@ -266,6 +266,7 @@ void setup() {
 }
 
 void loop() {  
-  ManageDoorMode(isProgrammingMode);  
   ManageLightMode(isDoorOpen, isProgrammingMode);
+  ManageDoorMode(isProgrammingMode);  
+  
 }
